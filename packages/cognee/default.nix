@@ -8,6 +8,7 @@
 
   # dependencies
   aiofiles,
+  cryptography,
   aiohttp,
   aiolimiter,
   aiosqlite,
@@ -43,6 +44,7 @@
   structlog,
   tenacity,
   tiktoken,
+  transformers,
   typing-extensions,
   uvicorn,
   websockets,
@@ -91,6 +93,7 @@ buildPythonPackage (finalAttrs: {
   dependencies = [
     aiofiles
     aiohttp
+    cryptography
     aiolimiter
     aiosqlite
     alembic
@@ -125,6 +128,7 @@ buildPythonPackage (finalAttrs: {
     structlog
     tenacity
     tiktoken
+    transformers
     typing-extensions
     uvicorn
     websockets

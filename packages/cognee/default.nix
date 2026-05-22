@@ -13,24 +13,24 @@
   aiolimiter,
   aiosqlite,
   alembic,
+  cbor2,
+  datamodel-code-generator,
   diskcache,
   fakeredis,
-  fastembed,
   fastapi,
   fastapi-users-db-sqlalchemy,
   filetype,
   gunicorn,
   instructor,
   jinja2,
-  kuzu,
+  ladybug,
   lancedb,
+  langdetect,
   limits,
   litellm,
-  mistralai,
   nbformat,
   networkx,
   numpy,
-  onnxruntime,
   openai,
   pydantic,
   pydantic-settings,
@@ -44,12 +44,13 @@
   structlog,
   tenacity,
   tiktoken,
-  transformers,
   typing-extensions,
+  urllib3,
   uvicorn,
   websockets,
 
   # optional-dependencies
+  apscheduler,
   asyncpg,
   beautifulsoup4,
   chromadb,
@@ -58,34 +59,34 @@
   lxml,
   mcp,
   neo4j,
+  nltk,
   pgvector,
   playwright,
   protego,
   psycopg2,
+  psycopg2-binary,
   pypika,
+  transformers,
+  unstructured,
 }:
 
 buildPythonPackage (finalAttrs: {
   pname = "cognee";
-  version = "0.5.1";
+  version = "1.1.0";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "topoteretes";
     repo = "cognee";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-4s3DOvHsAHHoyivwcMX7JJNzNzueAE/qdrdd1w6HGkc=";
+    hash = "sha256-d9itqlCbEBJZilCJsBldUkg1Uy9GCor1cCemazLTJmo=";
   };
 
   build-system = [ hatchling ];
 
   pythonRelaxDeps = [
-    "fastembed"
-    "fastapi-users"
-    "kuzu"
+    "ladybug"
     "limits"
-    "onnxruntime"
-    "pydantic"
     "pylance"
     "rdflib"
   ];
@@ -97,24 +98,24 @@ buildPythonPackage (finalAttrs: {
     aiolimiter
     aiosqlite
     alembic
+    cbor2
+    datamodel-code-generator
     diskcache
     fakeredis
-    fastembed
     fastapi
     fastapi-users-db-sqlalchemy
     filetype
     gunicorn
     instructor
     jinja2
-    kuzu
+    ladybug
     lancedb
+    langdetect
     limits
     litellm
-    mistralai
     nbformat
     networkx
     numpy
-    onnxruntime
     openai
     pydantic
     pydantic-settings
@@ -128,8 +129,8 @@ buildPythonPackage (finalAttrs: {
     structlog
     tenacity
     tiktoken
-    transformers
     typing-extensions
+    urllib3
     uvicorn
     websockets
   ];
@@ -138,6 +139,11 @@ buildPythonPackage (finalAttrs: {
     chromadb = [
       chromadb
       pypika
+    ];
+    docs = [
+      lxml
+      nltk
+      unstructured
     ];
     mcp = [
       fastmcp
@@ -150,7 +156,13 @@ buildPythonPackage (finalAttrs: {
       pgvector
       psycopg2
     ];
+    postgres-binary = [
+      asyncpg
+      pgvector
+      psycopg2-binary
+    ];
     scraping = [
+      apscheduler
       beautifulsoup4
       lxml
       playwright

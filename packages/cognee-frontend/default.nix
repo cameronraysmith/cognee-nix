@@ -58,9 +58,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
     dontFixup = true;
 
-    # TODO: outputHash to be replaced with real value after build cycle
-    # captures node_modules contents for v1.1.0 (new Mantine UI deps).
-    outputHash = lib.fakeHash;
+    outputHash = "sha256-Ww+IzVEqU2NuG0lIuPi7jGgdHx8Q+yEQMOTcY6eB4bU=";
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
   };

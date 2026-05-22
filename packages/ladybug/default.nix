@@ -70,6 +70,10 @@ buildPythonPackage (finalAttrs: {
     pytestCheckHook
   ];
 
+  preCheck = ''
+    export HOME=$TMPDIR
+  '';
+
   enabledTestPaths = [
     "test/"
   ];
@@ -105,6 +109,7 @@ buildPythonPackage (finalAttrs: {
     "test/test_scan_pyarrow.py"
     "test/test_torch_geometric.py"
     "test/test_torch_geometric_remote_backend.py"
+    "test/test_torch_import_order.py"
     # Subprocess tests that spawn new Python processes with build_dir
     "test/test_query_result_close.py"
     "test/test_wal.py"

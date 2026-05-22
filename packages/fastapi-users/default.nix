@@ -43,7 +43,10 @@ buildPythonPackage rec {
 
   nativeBuildInputs = [ pythonRelaxDepsHook ];
 
-  pythonRelaxDeps = [ "python-multipart" ];
+  pythonRelaxDeps = [
+    "python-multipart"
+    "pyjwt"
+  ];
 
   dependencies = [
     fastapi

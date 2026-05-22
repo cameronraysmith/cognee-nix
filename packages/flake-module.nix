@@ -9,8 +9,9 @@
       fastapi-users-db-sqlalchemy = pythonPackages.callPackage ./fastapi-users-db-sqlalchemy {
         inherit fastapi-users;
       };
+      ladybug = pythonPackages.callPackage ./ladybug { };
       cognee = pythonPackages.callPackage ./cognee {
-        inherit fastapi-users-db-sqlalchemy;
+        inherit fastapi-users-db-sqlalchemy ladybug;
       };
       cognee-mcp = pythonPackages.callPackage ./cognee-mcp {
         inherit cognee;
@@ -25,6 +26,7 @@
           cognee-mcp
           fastapi-users
           fastapi-users-db-sqlalchemy
+          ladybug
           ;
       };
     };

@@ -20,6 +20,7 @@
         ./dev/checks.nix
         ./dev/formatter.nix
         ./dev/shell.nix
+        ./nixos/flake-module.nix
         ./packages/flake-module.nix
         ./overlays/flake-module.nix
       ];

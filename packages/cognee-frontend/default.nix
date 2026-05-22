@@ -9,7 +9,7 @@
   bun,
   nodejs_22,
   makeWrapper,
-  inter,
+  geist-font,
 }:
 let
   nodejs = nodejs_22;
@@ -17,13 +17,13 @@ let
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "cognee-frontend";
-  version = "0.5.1";
+  version = "1.1.0";
 
   src = fetchFromGitHub {
     owner = "topoteretes";
     repo = "cognee";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-4s3DOvHsAHHoyivwcMX7JJNzNzueAE/qdrdd1w6HGkc=";
+    hash = "sha256-d9itqlCbEBJZilCJsBldUkg1Uy9GCor1cCemazLTJmo=";
   };
 
   inherit sourceRoot;
@@ -58,7 +58,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
     dontFixup = true;
 
-    outputHash = "sha256-xvvzmNmNnG7VAz1IDlPUNnbVpzG9JbJnJn82sI33k/M=";
+    # TODO: outputHash to be replaced with real value after build cycle
+    # captures node_modules contents for v1.1.0 (new Mantine UI deps).
+    outputHash = lib.fakeHash;
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
   };
@@ -74,14 +76,33 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     chmod -R u+w node_modules
     patchShebangs node_modules
 
-    # Use local Inter font from nixpkgs instead of Google Fonts
-    # Google Fonts require network access which is not available in Nix sandbox
+    # Use local Geist fonts from nixpkgs instead of Google Fonts.
+    # Google Fonts require network access which is not available in Nix sandbox.
     mkdir -p src/app/fonts
-    cp ${inter}/share/fonts/truetype/InterVariable.ttf src/app/fonts/
+    cp ${geist-font}/share/fonts/opentype/Geist-Regular.otf src/app/fonts/
+    cp ${geist-font}/share/fonts/opentype/GeistMono-Regular.otf src/app/fonts/
 
+    # Replace next/font/google Geist + Geist_Mono imports with local OTF files.
+    # Each Geist({...}) / Geist_Mono({...}) call spans multiple lines in
+    # src/app/layout.tsx; pass the multi-line blocks verbatim to --replace-fail
+    # so the `subsets: ["latin"]` field (invalid for next/font/local) is
+    # dropped entirely rather than left dangling inside the new call.
     substituteInPlace src/app/layout.tsx \
-      --replace-fail 'import { Inter } from "next/font/google";' 'import localFont from "next/font/local";' \
-      --replace-fail 'const inter = Inter({ subsets: ["latin"] });' 'const inter = localFont({ src: "./fonts/InterVariable.ttf", variable: "--font-inter" });'
+      --replace-fail 'import { Geist, Geist_Mono } from "next/font/google";' 'import localFont from "next/font/local";' \
+      --replace-fail 'const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});' 'const geistSans = localFont({
+  src: "./fonts/Geist-Regular.otf",
+  variable: "--font-geist-sans",
+});' \
+      --replace-fail 'const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});' 'const geistMono = localFont({
+  src: "./fonts/GeistMono-Regular.otf",
+  variable: "--font-geist-mono",
+});'
 
     runHook postConfigure
   '';

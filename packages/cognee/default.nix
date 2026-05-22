@@ -89,6 +89,7 @@ buildPythonPackage (finalAttrs: {
     "limits"
     "pylance"
     "rdflib"
+    "websockets"
   ];
 
   dependencies = [

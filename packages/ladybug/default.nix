@@ -84,6 +84,7 @@ buildPythonPackage (finalAttrs: {
     # Tests requiring dataset fixtures (conn_db_readonly/conn_db_readwrite)
     # which fail due to path resolution issues in init_demo within the sandbox
     "test/test_arrow.py"
+    "test/test_arrow_memory_backed_table.py"
     "test/test_async_connection.py"
     "test/test_connection.py"
     "test/test_datatype.py"

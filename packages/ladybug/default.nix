@@ -113,6 +113,10 @@ buildPythonPackage (finalAttrs: {
     # Subprocess tests that spawn new Python processes with build_dir
     "test/test_query_result_close.py"
     "test/test_wal.py"
+    # Test downloads libjson.lbug_extension from extension.ladybugdb.com at
+    # runtime, which the nix build sandbox blocks. Linux-specific failure;
+    # darwin appears to use a cached extension or skip the download path.
+    "test/test_json.py"
   ];
 
   pythonImportsCheck = [ "ladybug" ];

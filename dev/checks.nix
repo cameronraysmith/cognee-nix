@@ -18,17 +18,28 @@
       # declarations rather than being re-declared piecemeal here.
       cogneeOverlay = (import ../overlays/flake-module.nix).flake.overlays.default;
 
+      # Inject the locally-built cognee-frontend derivation into the eval-time
+      # nixpkgs so that fixtures enabling the frontend can render their unit
+      # text without the option's default (`pkgs.cognee-frontend or null`)
+      # collapsing to `null`. The frontend is a Node.js package and lives in
+      # the per-system flake outputs rather than the python overlay.
+      cogneeFrontendOverlay = _: _: { inherit (config.packages) cognee-frontend; };
+
       # Shared harness applied to every fixture composition: a stub host
       # platform so eval works on darwin, the cognee overlay so the package
-      # set surfaces the cognee derivations, and ACME terms acceptance so the
-      # ambient nginx-with-TLS path does not generate assertion noise that
-      # masks the cognee-owned assertions under test.
+      # set surfaces the cognee derivations, the frontend injection overlay,
+      # and ACME terms acceptance so the ambient nginx-with-TLS path does not
+      # generate assertion noise that masks the cognee-owned assertions under
+      # test.
       cogneeBaseModule =
         { lib, ... }:
         {
           boot.isContainer = true;
           system.stateVersion = lib.trivial.release;
-          nixpkgs.overlays = [ cogneeOverlay ];
+          nixpkgs.overlays = [
+            cogneeOverlay
+            cogneeFrontendOverlay
+          ];
           nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
           security.acme.acceptTerms = true;
           security.acme.defaults.email = "admin@example.invalid";
@@ -166,60 +177,245 @@
       allFixturesPassed = builtins.all (r: r.ok) fixtureResults;
       fixtureReport = builtins.concatStringsSep "\n" (map (r: r.line) fixtureResults);
 
-      # Tier 1.4 — Systemd unit shape audit. Evaluate the full-stack fixture,
-      # then assert structural properties on the rendered cognee.service unit
-      # text plus the module-source body that feeds writeShellScript. The
-      # unit text covers hardening directives nixos renders into [Service].
-      # The ExecStart payload (gunicorn/uvicorn entry point) is asserted
-      # against the cognee module source rather than the realised script
-      # because realising the script would pull the cognee python env into
-      # the check closure, defeating its purpose as a pure eval-tier check.
-      systemdShapeEval = evalCognee (import (cogneeFixturesDir + "/full-stack-ok.nix"));
-      cogneeUnitText = systemdShapeEval.config.systemd.units."cognee.service".text;
+      # Tier 1.4 — Systemd unit shape audit, expanded into a per-fixture
+      # matrix. For each OK fixture, evaluate the full NixOS module system,
+      # then assert structural properties on the rendered systemd unit
+      # text(s). All assertions are forced at Nix eval time via `throw`, so
+      # a derivation that builds successfully implies every substring
+      # constraint held. The ExecStart payload (gunicorn/uvicorn entry
+      # point) is asserted against the cognee module source rather than the
+      # realised script because realising it would pull the cognee python
+      # env into the check closure, defeating the purpose as a pure
+      # eval-tier check.
       cogneeModuleSource = builtins.readFile cogneeModulePath;
+
+      # Hardening directives common to every cognee-owned systemd unit
+      # (cognee.service, cognee-mcp.service, cognee-frontend.service). The
+      # module body merges the shared `hardening` attrset into each unit's
+      # serviceConfig, so a single check function suffices.
+      commonHardening = [
+        "StateDirectory=cognee"
+        "StateDirectoryMode=0700"
+        "ProtectSystem=strict"
+        "NoNewPrivileges=true"
+        "PrivateTmp=true"
+        "User=cognee"
+        "Group=cognee"
+        "RestrictAddressFamilies=AF_INET"
+        "RestrictAddressFamilies=AF_UNIX"
+        "RestrictNamespaces=true"
+        "Restart=on-failure"
+      ];
 
       hasSubstring = needle: haystack: lib.hasInfix needle haystack;
 
-      requireSubstring =
+      requireIn =
         label: needle: haystack:
         if hasSubstring needle haystack then
           "PASS require '${needle}' in ${label}"
         else
-          throw "cognee-module-systemd-shape: required substring '${needle}' missing from ${label}";
+          throw "cognee-module-shape: required substring '${needle}' missing from ${label}";
 
-      forbidSubstring =
+      forbidIn =
         label: needle: haystack:
         if hasSubstring needle haystack then
-          throw "cognee-module-systemd-shape: forbidden substring '${needle}' present in ${label}"
+          throw "cognee-module-shape: forbidden substring '${needle}' present in ${label}"
         else
           "PASS forbid '${needle}' in ${label}";
 
-      unitChecks = [
-        (requireSubstring "cognee.service" "StateDirectory=cognee" cogneeUnitText)
-        (requireSubstring "cognee.service" "StateDirectoryMode=0700" cogneeUnitText)
-        (requireSubstring "cognee.service" "ProtectSystem=strict" cogneeUnitText)
-        (requireSubstring "cognee.service" "NoNewPrivileges=true" cogneeUnitText)
-        (requireSubstring "cognee.service" "PrivateTmp=true" cogneeUnitText)
-        (requireSubstring "cognee.service" "User=cognee" cogneeUnitText)
-        (requireSubstring "cognee.service" "Group=cognee" cogneeUnitText)
-        (requireSubstring "cognee.service" "LoadCredential=FASTAPI_USERS_JWT_SECRET:/run/secrets/cognee-jwt"
-          cogneeUnitText
-        )
-        (requireSubstring "cognee.service" "LoadCredential=LLM_API_KEY:/run/secrets/cognee-openai"
-          cogneeUnitText
-        )
-        (requireSubstring "cognee.service" "RestrictAddressFamilies=AF_INET" cogneeUnitText)
-        (requireSubstring "cognee.service" "RestrictAddressFamilies=AF_UNIX" cogneeUnitText)
-        (requireSubstring "cognee.service" "RestrictNamespaces=true" cogneeUnitText)
-        (requireSubstring "cognee.service" "Restart=on-failure" cogneeUnitText)
-        (forbidSubstring "cognee.service" "User=root" cogneeUnitText)
-        (requireSubstring "cognee module source" "/bin/gunicorn" cogneeModuleSource)
-        (requireSubstring "cognee module source" "uvicorn.workers.UvicornWorker" cogneeModuleSource)
-        (requireSubstring "cognee module source" "cognee.api.client:app" cogneeModuleSource)
+      # Per-fixture shape specification. Each entry names an OK fixture and
+      # declares the required/forbidden substrings within each rendered unit
+      # plus optional checks against the module source.
+      #
+      # NOTE on `default-minimal`: the `minimal-ok` fixture leaves
+      # `database.createLocally` at its default (`true`), so `DB_PROVIDER`
+      # renders as `postgres` rather than `sqlite`. We assert postgres
+      # accordingly. A sqlite-rendering fixture would need
+      # `database.createLocally = false`, which no current fixture sets.
+      shapeFixtures = {
+        default-minimal = {
+          fixture = "minimal-ok";
+          units = {
+            "cognee.service" = {
+              requires = commonHardening ++ [
+                "LoadCredential=FASTAPI_USERS_JWT_SECRET"
+                "LoadCredential=LLM_API_KEY"
+                "DB_PROVIDER=postgres"
+                "VECTOR_DB_PROVIDER=lancedb"
+              ];
+              forbids = [
+                "User=root"
+                "DB_PROVIDER=sqlite"
+              ];
+            };
+          };
+        };
+
+        postgres-pgvector = {
+          fixture = "pgvector-ok";
+          units = {
+            "cognee.service" = {
+              requires = commonHardening ++ [
+                "LoadCredential=FASTAPI_USERS_JWT_SECRET"
+                "DB_PROVIDER=postgres"
+                "VECTOR_DB_PROVIDER=pgvector"
+              ];
+              forbids = [
+                "User=root"
+                "VECTOR_DB_PROVIDER=lancedb"
+              ];
+            };
+          };
+        };
+
+        mcp-companion = {
+          fixture = "mcp-ok";
+          units = {
+            "cognee.service" = {
+              requires = commonHardening ++ [ "ExecStart=" ];
+              forbids = [ "User=root" ];
+            };
+            "cognee-mcp.service" = {
+              requires = [
+                "/bin/cognee-mcp"
+                "--transport"
+                "--api-url"
+                "User=cognee"
+                "ProtectSystem=strict"
+                "Restart=on-failure"
+              ];
+              forbids = [ "User=root" ];
+            };
+          };
+        };
+
+        frontend-companion = {
+          fixture = "frontend-ok";
+          units = {
+            "cognee.service" = {
+              requires = commonHardening;
+              forbids = [ "User=root" ];
+            };
+            "cognee-frontend.service" = {
+              requires = [
+                "/bin/cognee-frontend"
+                "NEXT_PUBLIC_BACKEND_API_URL"
+                "User=cognee"
+                "ProtectSystem=strict"
+                "Restart=on-failure"
+              ];
+              forbids = [ "User=root" ];
+            };
+          };
+        };
+
+        full-stack = {
+          fixture = "full-stack-ok";
+          units = {
+            "cognee.service" = {
+              requires = commonHardening ++ [
+                "DB_PROVIDER=postgres"
+                "LoadCredential=FASTAPI_USERS_JWT_SECRET"
+                "LoadCredential=LLM_API_KEY"
+                "ExecStart="
+              ];
+              forbids = [ "User=root" ];
+            };
+            "cognee-mcp.service" = {
+              requires = [
+                "--api-url"
+                "/bin/cognee-mcp"
+              ];
+              forbids = [ "User=root" ];
+            };
+            "cognee-frontend.service" = {
+              requires = [
+                "/bin/cognee-frontend"
+                "NEXT_PUBLIC_BACKEND_API_URL"
+              ];
+              forbids = [ "User=root" ];
+            };
+          };
+          # Module-source assertions are only meaningful once per matrix; we
+          # anchor them on the full-stack entry which exercises every
+          # codepath the module gates on.
+          sourceRequires = [
+            "/bin/gunicorn"
+            "uvicorn.workers.UvicornWorker"
+            "cognee.api.client:app"
+          ];
+        };
+      };
+
+      evalShapeFixture =
+        spec:
+        let
+          eval = evalCognee (import (cogneeFixturesDir + "/${spec.fixture}.nix"));
+          units = eval.config.systemd.units;
+
+          checkUnit =
+            unitName:
+            { requires, forbids }:
+            let
+              text = units.${unitName}.text;
+              requireLines = map (n: requireIn unitName n text) requires;
+              forbidLines = map (n: forbidIn unitName n text) forbids;
+            in
+            requireLines ++ forbidLines;
+
+          unitLines = lib.concatLists (
+            lib.mapAttrsToList checkUnit spec.units
+          );
+
+          sourceLines = map (n: requireIn "cognee module source" n cogneeModuleSource) (
+            spec.sourceRequires or [ ]
+          );
+        in
+        unitLines ++ sourceLines;
+
+      buildShapeCheck =
+        name: spec:
+        let
+          lines = evalShapeFixture spec;
+          report = builtins.concatStringsSep "\n" lines;
+        in
+        pkgs.runCommand "cognee-module-shape-${name}"
+          {
+            passthru = {
+              inherit lines;
+            };
+          }
+          ''
+            cat > "$out" <<'REPORT'
+            cognee systemd shape audit (${name}, fixture: ${spec.fixture})
+            ==============================================================
+            ${report}
+            REPORT
+          '';
+
+      shapeMatrixChecks = lib.mapAttrs' (
+        name: spec: lib.nameValuePair "cognee-module-shape-${name}" (buildShapeCheck name spec)
+      ) shapeFixtures;
+
+      # Tier 1.5 — Static lints. statix surfaces idiomatic-nix warnings;
+      # deadnix surfaces unused bindings. Both run as pure derivations
+      # against the module source and the eval-fixtures directory. statix
+      # accepts a single TARGET per invocation, so we run it once per path.
+      lintTargets = [
+        cogneeModulePath
+        ../nixos/tests/cognee
       ];
+
+      lintStatixScript = lib.concatMapStringsSep "\n" (target: ''
+        ${pkgs.statix}/bin/statix check ${target}
+      '') lintTargets;
+
+      lintDeadnixScript = lib.concatMapStringsSep "\n" (target: ''
+        ${pkgs.deadnix}/bin/deadnix --fail ${target}
+      '') lintTargets;
     in
     {
-      checks = packageChecks // {
+      checks = packageChecks // shapeMatrixChecks // {
         cognee-module-eval = pkgs.runCommand "cognee-module-eval" { } ''
           pname=${cogneeNixos.config.services.cognee.package.pname}
           echo "$pname" > "$out"
@@ -253,23 +449,15 @@
               ''}
             '';
 
-        cognee-module-systemd-shape =
-          pkgs.runCommand "cognee-module-systemd-shape"
-            {
-              passthru = {
-                inherit unitChecks;
-              };
-            }
-            ''
-              # Each requireSubstring/forbidSubstring helper throws at Nix
-              # eval time on failure, so reaching this shell already means
-              # every structural assertion held. Materialise the report.
-              cat > "$out" <<'REPORT'
-              cognee.service shape audit
-              ==========================
-              ${builtins.concatStringsSep "\n" unitChecks}
-              REPORT
-            '';
+        cognee-module-lint-statix = pkgs.runCommand "cognee-module-lint-statix" { } ''
+          ${lintStatixScript}
+          touch "$out"
+        '';
+
+        cognee-module-lint-deadnix = pkgs.runCommand "cognee-module-lint-deadnix" { } ''
+          ${lintDeadnixScript}
+          touch "$out"
+        '';
       };
     };
 }

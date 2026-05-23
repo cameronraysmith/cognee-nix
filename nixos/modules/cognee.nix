@@ -482,7 +482,7 @@ in
       users.users = mkIf (cfg.user == "cognee") {
         cognee = {
           isSystemUser = true;
-          group = cfg.group;
+          inherit (cfg) group;
           home = cfg.dataDir;
         };
       };

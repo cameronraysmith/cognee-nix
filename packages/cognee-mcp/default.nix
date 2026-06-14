@@ -14,14 +14,14 @@
 
 buildPythonPackage (finalAttrs: {
   pname = "cognee-mcp";
-  version = "1.1.0";
+  version = "1.1.2";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "topoteretes";
     repo = "cognee";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-d9itqlCbEBJZilCJsBldUkg1Uy9GCor1cCemazLTJmo=";
+    hash = "sha256-Ef908AH6QvBLvMxR+aRy4cgK1HIpqchCquQSSJ24AWk=";
   };
 
   sourceRoot = "source/cognee-mcp";

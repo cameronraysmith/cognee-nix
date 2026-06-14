@@ -31,7 +31,9 @@ let
   cfg = config.services.cognee;
 
   python = cfg.package.pythonModule;
-  cogneeEnv = python.withPackages (_: [ cfg.package ]);
+  cogneeEnv = python.withPackages (
+    _: [ cfg.package ] ++ lib.optionals usePostgres cfg.package.optional-dependencies.postgres
+  );
 
   mcpPackage = pkgs.python313Packages.cognee-mcp;
   mcpEnv = python.withPackages (_: [ mcpPackage ]);
@@ -82,6 +84,8 @@ let
   ) cfg.settings;
 
   cogneeEnvironment = baseEnv // defaultUserEmailEnv // settingsEnv;
+
+  usePostgres = cogneeEnvironment.DB_PROVIDER == "postgres" || cfg.vectorStore.backend == "pgvector";
 
   hardening = {
     CapabilityBoundingSet = "";

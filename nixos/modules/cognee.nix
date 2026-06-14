@@ -368,7 +368,7 @@ in
       default = { };
       description = ''
         Free-form environment-variable settings passed to cognee. See the
-        upstream `.env.template` at v1.1.0 for the catalog of supported keys.
+        upstream `.env.template` at v1.1.2 for the catalog of supported keys.
       '';
     };
 

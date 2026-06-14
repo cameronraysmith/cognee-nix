@@ -30,6 +30,8 @@ let
 
   cfg = config.services.cognee;
 
+  bracketIpv6 = addr: if lib.hasInfix ":" addr then "[${addr}]" else addr;
+
   python = cfg.package.pythonModule;
   cogneeEnv = python.withPackages (
     _: [ cfg.package ] ++ lib.optionals usePostgres cfg.package.optional-dependencies.postgres
@@ -153,7 +155,7 @@ let
       --workers ${toString cfg.workers} \
       -k uvicorn.workers.UvicornWorker \
       --timeout 30000 \
-      --bind ${cfg.listenAddress}:${toString cfg.port} \
+      --bind ${bracketIpv6 cfg.listenAddress}:${toString cfg.port} \
       cognee.api.client:app
   '';
 in
@@ -608,7 +610,7 @@ in
           WorkingDirectory = cfg.dataDir;
           ReadWritePaths = [ cfg.dataDir ];
           ExecStart = ''
-            ${mcpEnv}/bin/cognee-mcp --transport ${cfg.mcp.transport} --host ${cfg.mcp.listenAddress} --port ${toString cfg.mcp.port}${optionalString cfg.mcp.proxyApi " --api-url http://${cfg.listenAddress}:${toString cfg.port}"}${optionalString cfg.mcp.proxyApi " --no-migration"}
+            ${mcpEnv}/bin/cognee-mcp --transport ${cfg.mcp.transport} --host ${cfg.mcp.listenAddress} --port ${toString cfg.mcp.port}${optionalString cfg.mcp.proxyApi " --api-url http://${bracketIpv6 cfg.listenAddress}:${toString cfg.port}"}${optionalString cfg.mcp.proxyApi " --no-migration"}
           '';
           Restart = "on-failure";
           RestartSec = "5s";
@@ -658,10 +660,10 @@ in
           forceSSL = true;
           enableACME = true;
           locations."/api/" = {
-            proxyPass = "http://${cfg.listenAddress}:${toString cfg.port}/api/";
+            proxyPass = "http://${bracketIpv6 cfg.listenAddress}:${toString cfg.port}/api/";
           };
           locations."/" = mkIf cfg.frontend.enable {
-            proxyPass = "http://${cfg.frontend.listenAddress}:${toString cfg.frontend.port}/";
+            proxyPass = "http://${bracketIpv6 cfg.frontend.listenAddress}:${toString cfg.frontend.port}/";
           };
         };
       };

@@ -46,6 +46,7 @@ let
   hasJwtCredential = cfg.auth.jwtSecretFile != null;
   hasLlmCredential = cfg.llm.apiKeyFile != null;
   hasEmbeddingCredential = cfg.llm.embeddingApiKeyFile != null;
+  hasDefaultUserPasswordCredential = cfg.auth.defaultUserPasswordFile != null;
 
   baseEnv = {
     HTTP_API_HOST = cfg.listenAddress;
@@ -124,7 +125,8 @@ let
   credentialLoads =
     lib.optional hasJwtCredential "FASTAPI_USERS_JWT_SECRET:${cfg.auth.jwtSecretFile}"
     ++ lib.optional hasLlmCredential "LLM_API_KEY:${cfg.llm.apiKeyFile}"
-    ++ lib.optional hasEmbeddingCredential "EMBEDDING_API_KEY:${cfg.llm.embeddingApiKeyFile}";
+    ++ lib.optional hasEmbeddingCredential "EMBEDDING_API_KEY:${cfg.llm.embeddingApiKeyFile}"
+    ++ lib.optional hasDefaultUserPasswordCredential "DEFAULT_USER_PASSWORD:${cfg.auth.defaultUserPasswordFile}";
 
   cogneePreStart = ''
     set -eu
@@ -357,6 +359,20 @@ in
         default = null;
         description = "Optional default user email for the bootstrap account.";
       };
+
+      defaultUserPasswordFile = mkOption {
+        type = nullOr path;
+        default = null;
+        description = ''
+          Path to a file containing the password for the bootstrapped default
+          superuser account. When set, the password is delivered to cognee as
+          `DEFAULT_USER_PASSWORD` via a systemd `LoadCredential` (rather than a
+          plain environment variable, since it is a secret) and exported at
+          start. When `null`, cognee falls back to its built-in default password
+          ("default_password") for the bootstrapped superuser, which is insecure
+          for any real deployment.
+        '';
+      };
     };
 
     settings = mkOption {
@@ -535,6 +551,10 @@ in
               ${optionalString hasEmbeddingCredential ''
                 EMBEDDING_API_KEY="$(cat "$CREDENTIALS_DIRECTORY/EMBEDDING_API_KEY")"
                 export EMBEDDING_API_KEY
+              ''}
+              ${optionalString hasDefaultUserPasswordCredential ''
+                DEFAULT_USER_PASSWORD="$(cat "$CREDENTIALS_DIRECTORY/DEFAULT_USER_PASSWORD")"
+                export DEFAULT_USER_PASSWORD
               ''}
             fi
             exec ${cogneeExecStart}

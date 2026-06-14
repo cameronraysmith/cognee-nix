@@ -29,7 +29,6 @@ in
 
         # Embedded-only path: sqlite + lancedb + ladybug. No postgres provisioning.
         database.createLocally = false;
-        settings.DB_PROVIDER = "sqlite";
 
         vectorStore.backend = "lancedb";
         graphStore.backend = "ladybug";
@@ -39,11 +38,14 @@ in
 
         llm.apiKeyFile = openaiStub;
 
-        # Hermetic settings: mock the embedding provider so startup does not
-        # require network access to OpenAI, and disable telemetry so the
-        # service does not attempt outbound posthog calls.
-        settings.MOCK_EMBEDDING = "true";
-        settings.TELEMETRY_DISABLED = "true";
+        # Hermetic settings: MOCK_EMBEDDING mocks the embedding provider so
+        # startup does not require network access to OpenAI, and
+        # TELEMETRY_DISABLED prevents outbound posthog calls.
+        settings = {
+          DB_PROVIDER = "sqlite";
+          MOCK_EMBEDDING = "true";
+          TELEMETRY_DISABLED = "true";
+        };
       };
 
       system.stateVersion = lib.trivial.release;

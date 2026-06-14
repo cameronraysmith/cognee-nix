@@ -363,9 +363,7 @@
             in
             requireLines ++ forbidLines;
 
-          unitLines = lib.concatLists (
-            lib.mapAttrsToList checkUnit spec.units
-          );
+          unitLines = lib.concatLists (lib.mapAttrsToList checkUnit spec.units);
 
           sourceLines = map (n: requireIn "cognee module source" n cogneeModuleSource) (
             spec.sourceRequires or [ ]
@@ -415,49 +413,52 @@
       '') lintTargets;
     in
     {
-      checks = packageChecks // shapeMatrixChecks // {
-        cognee-module-eval = pkgs.runCommand "cognee-module-eval" { } ''
-          pname=${cogneeNixos.config.services.cognee.package.pname}
-          echo "$pname" > "$out"
-          if [ "$pname" != "cognee" ]; then
-            echo "package.pname mismatch: $pname" >&2
-            exit 1
-          fi
-        '';
+      checks =
+        packageChecks
+        // shapeMatrixChecks
+        // {
+          cognee-module-eval = pkgs.runCommand "cognee-module-eval" { } ''
+            pname=${cogneeNixos.config.services.cognee.package.pname}
+            echo "$pname" > "$out"
+            if [ "$pname" != "cognee" ]; then
+              echo "package.pname mismatch: $pname" >&2
+              exit 1
+            fi
+          '';
 
-        cognee-module-options-snapshot = pkgs.runCommand "cognee-module-options-snapshot" { } ''
-          cp ${optionsDoc.optionsCommonMark} "$out"
-        '';
+          cognee-module-options-snapshot = pkgs.runCommand "cognee-module-options-snapshot" { } ''
+            cp ${optionsDoc.optionsCommonMark} "$out"
+          '';
 
-        cognee-module-assertions =
-          pkgs.runCommand "cognee-module-assertions"
-            {
-              passthru = {
-                inherit fixtureResults allFixturesPassed;
-              };
-            }
-            ''
-              cat > "$out" <<'REPORT'
-              cognee module assertion coverage
-              ================================
-              ${fixtureReport}
-              REPORT
-              ${lib.optionalString (!allFixturesPassed) ''
-                echo "one or more cognee fixtures produced an unexpected verdict; see $out" >&2
-                cat "$out" >&2
-                exit 1
-              ''}
-            '';
+          cognee-module-assertions =
+            pkgs.runCommand "cognee-module-assertions"
+              {
+                passthru = {
+                  inherit fixtureResults allFixturesPassed;
+                };
+              }
+              ''
+                cat > "$out" <<'REPORT'
+                cognee module assertion coverage
+                ================================
+                ${fixtureReport}
+                REPORT
+                ${lib.optionalString (!allFixturesPassed) ''
+                  echo "one or more cognee fixtures produced an unexpected verdict; see $out" >&2
+                  cat "$out" >&2
+                  exit 1
+                ''}
+              '';
 
-        cognee-module-lint-statix = pkgs.runCommand "cognee-module-lint-statix" { } ''
-          ${lintStatixScript}
-          touch "$out"
-        '';
+          cognee-module-lint-statix = pkgs.runCommand "cognee-module-lint-statix" { } ''
+            ${lintStatixScript}
+            touch "$out"
+          '';
 
-        cognee-module-lint-deadnix = pkgs.runCommand "cognee-module-lint-deadnix" { } ''
-          ${lintDeadnixScript}
-          touch "$out"
-        '';
-      };
+          cognee-module-lint-deadnix = pkgs.runCommand "cognee-module-lint-deadnix" { } ''
+            ${lintDeadnixScript}
+            touch "$out"
+          '';
+        };
     };
 }

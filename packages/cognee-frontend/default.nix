@@ -9,7 +9,6 @@
   bun,
   nodejs_22,
   makeWrapper,
-  geist-font,
 }:
 let
   nodejs = nodejs_22;
@@ -17,13 +16,13 @@ let
 in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "cognee-frontend";
-  version = "1.1.0";
+  version = "1.1.2";
 
   src = fetchFromGitHub {
     owner = "topoteretes";
     repo = "cognee";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-d9itqlCbEBJZilCJsBldUkg1Uy9GCor1cCemazLTJmo=";
+    hash = "sha256-Ef908AH6QvBLvMxR+aRy4cgK1HIpqchCquQSSJ24AWk=";
   };
 
   inherit sourceRoot;
@@ -58,7 +57,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
     dontFixup = true;
 
-    outputHash = "sha256-Ww+IzVEqU2NuG0lIuPi7jGgdHx8Q+yEQMOTcY6eB4bU=";
+    outputHash = "sha256-9Nd8ifQ8i4goporh4tcw3AgW36WmZ/tuXM+J2Hmc1g8=";
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
   };
@@ -69,52 +68,24 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   ];
 
   configurePhase = ''
-    runHook preConfigure
-    cp -r ${finalAttrs.node_modules}/node_modules .
-    chmod -R u+w node_modules
-    patchShebangs node_modules
+      runHook preConfigure
+      cp -r ${finalAttrs.node_modules}/node_modules .
+      chmod -R u+w node_modules
+      patchShebangs node_modules
 
-    # Use local Geist fonts from nixpkgs instead of Google Fonts.
-    # Google Fonts require network access which is not available in Nix sandbox.
-    mkdir -p src/app/fonts
-    cp ${geist-font}/share/fonts/opentype/Geist-Regular.otf src/app/fonts/
-    cp ${geist-font}/share/fonts/opentype/GeistMono-Regular.otf src/app/fonts/
+      # Bypass `tsc` type-checking during `next build`. Upstream cognee-frontend
+      # carries a number of TypeScript errors (CopyApiKeyButton apiKey shape
+      # mismatch, unused @ts-expect-error directives, etc.) that the upstream
+      # dev workflow tolerates but `next build` rejects in strict mode. Rather
+      # than chase each error with a fragile substituteInPlace, we opt into
+      # `typescript.ignoreBuildErrors` in next.config.{ts,mjs}.
+      substituteInPlace next.config.ts \
+        --replace-fail 'const nextConfig: NextConfig = {' 'const nextConfig: NextConfig = {
+    typescript: { ignoreBuildErrors: true },'
+      substituteInPlace next.config.mjs \
+        --replace-fail 'const nextConfig = {}' 'const nextConfig = { typescript: { ignoreBuildErrors: true } }'
 
-    # Replace next/font/google Geist + Geist_Mono imports with local OTF files.
-    # Each Geist({...}) / Geist_Mono({...}) call spans multiple lines in
-    # src/app/layout.tsx; pass the multi-line blocks verbatim to --replace-fail
-    # so the `subsets: ["latin"]` field (invalid for next/font/local) is
-    # dropped entirely rather than left dangling inside the new call.
-    substituteInPlace src/app/layout.tsx \
-      --replace-fail 'import { Geist, Geist_Mono } from "next/font/google";' 'import localFont from "next/font/local";' \
-      --replace-fail 'const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});' 'const geistSans = localFont({
-  src: "./fonts/Geist-Regular.otf",
-  variable: "--font-geist-sans",
-});' \
-      --replace-fail 'const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});' 'const geistMono = localFont({
-  src: "./fonts/GeistMono-Regular.otf",
-  variable: "--font-geist-mono",
-});'
-
-    # Bypass `tsc` type-checking during `next build`. Upstream cognee-frontend
-    # carries a number of TypeScript errors (CopyApiKeyButton apiKey shape
-    # mismatch, unused @ts-expect-error directives, etc.) that the upstream
-    # dev workflow tolerates but `next build` rejects in strict mode. Rather
-    # than chase each error with a fragile substituteInPlace, we opt into
-    # `typescript.ignoreBuildErrors` in next.config.{ts,mjs}.
-    substituteInPlace next.config.ts \
-      --replace-fail 'const nextConfig: NextConfig = {' 'const nextConfig: NextConfig = {
-  typescript: { ignoreBuildErrors: true },'
-    substituteInPlace next.config.mjs \
-      --replace-fail 'const nextConfig = {}' 'const nextConfig = { typescript: { ignoreBuildErrors: true } }'
-
-    runHook postConfigure
+      runHook postConfigure
   '';
 
   buildPhase = ''

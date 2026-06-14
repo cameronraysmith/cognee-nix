@@ -41,6 +41,7 @@
   python-multipart,
   rdflib,
   sqlalchemy,
+  starlette,
   structlog,
   tenacity,
   tiktoken,
@@ -66,20 +67,19 @@
   psycopg2,
   psycopg2-binary,
   pypika,
-  transformers,
   unstructured,
 }:
 
 buildPythonPackage (finalAttrs: {
   pname = "cognee";
-  version = "1.1.0";
+  version = "1.1.2";
   pyproject = true;
 
   src = fetchFromGitHub {
     owner = "topoteretes";
     repo = "cognee";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-d9itqlCbEBJZilCJsBldUkg1Uy9GCor1cCemazLTJmo=";
+    hash = "sha256-Ef908AH6QvBLvMxR+aRy4cgK1HIpqchCquQSSJ24AWk=";
   };
 
   build-system = [ hatchling ];
@@ -127,6 +127,7 @@ buildPythonPackage (finalAttrs: {
     python-multipart
     rdflib
     sqlalchemy
+    starlette
     structlog
     tenacity
     tiktoken

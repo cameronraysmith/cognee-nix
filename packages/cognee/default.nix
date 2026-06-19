@@ -84,6 +84,15 @@ buildPythonPackage (finalAttrs: {
 
   build-system = [ hatchling ];
 
+  # Release read-only auth sessions explicitly so the connection returns to the
+  # pool instead of lingering idle-in-transaction, which otherwise exhausts the
+  # postgres pool under repeated API-key/auth lookups. rollback is correct and
+  # idempotent here because both sites are read-only.
+  patches = [
+    ./patches/0001-session-rollback-get-user-db.patch
+    ./patches/0002-session-rollback-get-by-token.patch
+  ];
+
   pythonRelaxDeps = [
     "ladybug"
     "limits"

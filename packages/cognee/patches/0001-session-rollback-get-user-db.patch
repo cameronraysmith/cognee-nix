@@ -1,0 +1,16 @@
+diff --git a/cognee/modules/users/get_user_db.py b/cognee/modules/users/get_user_db.py
+index 80a6f7b..d616402 100644
+--- a/cognee/modules/users/get_user_db.py
++++ b/cognee/modules/users/get_user_db.py
+@@ -10,7 +10,10 @@ from .models.User import User
+ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+     db_engine = get_relational_engine()
+     async with db_engine.get_async_session() as session:
+-        yield session
++        try:
++            yield session
++        finally:
++            await session.rollback()
+ 
+ 
+ async def get_user_db(session: AsyncSession = Depends(get_async_session)):

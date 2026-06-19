@@ -111,6 +111,15 @@ stdenvNoCC.mkDerivation (finalAttrs: {
             'process.env.NEXT_PUBLIC_LOCAL_API_URL || "https://kb.scientistexperience.net"'
       done
 
+      # SecurityWidget hardcodes the cloud-only /api/signout href, which is never
+      # bundled in a local (NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT=false) build and 404s.
+      # The build-time cloud flag covers TopBar's conditional href but not this
+      # literal, so rewrite it to the local-mode endpoint that the backend serves.
+      substituteInPlace "src/app/(app)/settings/elements/SecurityWidget.tsx" \
+        --replace-fail \
+          'href="/api/signout"' \
+          'href="/api/local-signout"'
+
       runHook postConfigure
   '';
 
@@ -118,6 +127,11 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     runHook preBuild
     export HOME=$TMPDIR
     export NEXT_TELEMETRY_DISABLED=1
+    # Build for local (self-hosted) mode. isCloudEnvironment() defaults to cloud
+    # unless this build-time-inlined flag is the literal "false", which flips
+    # cloud-gated UI (including TopBar's logout href) to the local endpoints the
+    # backend actually serves (/api/local-signout instead of /api/signout).
+    export NEXT_PUBLIC_IS_CLOUD_ENVIRONMENT=false
     npm run build
     runHook postBuild
   '';

@@ -1,0 +1,28 @@
+diff --git a/cognee/modules/users/get_user_manager.py b/cognee/modules/users/get_user_manager.py
+index f34dae2..e7a3b35 100644
+--- a/cognee/modules/users/get_user_manager.py
++++ b/cognee/modules/users/get_user_manager.py
+@@ -75,14 +75,17 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
+         prepared_api_key = prepare_api_key(token)
+ 
+         async with relational_engine.get_async_session() as session:
+-            user_api_key = (
+-                await session.execute(select(UserApiKey).filter_by(api_key=prepared_api_key))
+-            ).scalar()
++            try:
++                user_api_key = (
++                    await session.execute(select(UserApiKey).filter_by(api_key=prepared_api_key))
++                ).scalar()
+ 
+-            if user_api_key:
+-                user = await self.get(user_api_key.user_id)
++                if user_api_key:
++                    user = await self.get(user_api_key.user_id)
+ 
+-                return user
++                    return user
++            finally:
++                await session.rollback()
+ 
+ 
+ async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):

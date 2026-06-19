@@ -85,6 +85,32 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       substituteInPlace next.config.mjs \
         --replace-fail 'const nextConfig = {}' 'const nextConfig = { typescript: { ignoreBuildErrors: true } }'
 
+      # Rebind the build-time-inlined NEXT_PUBLIC_LOCAL_API_URL fallback per file.
+      # NEXT_PUBLIC_* is inlined at build time and an empty string is falsy, so
+      # the runtime env cannot reach these `||` defaults; the fallback literal is
+      # the only build-time lever. Client fetch bases become same-origin ("") so
+      # the browser issues /api/... requests under the serving vhost; the two
+      # files that render a copyable backend URL keep an absolute public origin.
+      for f in \
+        src/modules/instances/localFetch.ts \
+        src/modules/tenant/LocalProvider.tsx \
+        "src/app/(auth)/local-login/partials/LocalSignInForm.tsx" \
+        src/modules/users/getLocalUser.ts; do
+        substituteInPlace "$f" \
+          --replace-fail \
+            'process.env.NEXT_PUBLIC_LOCAL_API_URL || "http://localhost:8000"' \
+            'process.env.NEXT_PUBLIC_LOCAL_API_URL || ""'
+      done
+
+      for f in \
+        "src/app/(app)/api-keys/ApiKeysPage.tsx" \
+        "src/app/(app)/connect-agent/ConnectionModal.tsx"; do
+        substituteInPlace "$f" \
+          --replace-fail \
+            'process.env.NEXT_PUBLIC_LOCAL_API_URL || "http://localhost:8000"' \
+            'process.env.NEXT_PUBLIC_LOCAL_API_URL || "https://kb.scientistexperience.net"'
+      done
+
       runHook postConfigure
   '';
 

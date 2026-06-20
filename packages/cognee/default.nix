@@ -93,6 +93,12 @@ buildPythonPackage (finalAttrs: {
     ./patches/0002-session-rollback-get-by-token.patch
   ];
 
+  # The hosted SaaS 307-redirects the bare datasets collection to its trailing-slash form.
+  postPatch = ''
+    substituteInPlace cognee/cli/api_client.py \
+      --replace-fail '"/api/v1/datasets"' '"/api/v1/datasets/"'
+  '';
+
   pythonRelaxDeps = [
     "ladybug"
     "limits"

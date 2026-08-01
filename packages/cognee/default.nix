@@ -111,7 +111,6 @@ buildPythonPackage (finalAttrs: {
     # imported on the path this package is used for: cognee-cli speaking HTTP to a
     # remote API server.
     "gunicorn"
-    "ladybug"
     "limits"
     "pylance"
     "rdflib"

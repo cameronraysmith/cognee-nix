@@ -93,13 +93,24 @@ buildPythonPackage (finalAttrs: {
     ./patches/0002-session-rollback-get-by-token.patch
   ];
 
-  # The hosted SaaS 307-redirects the bare datasets collection to its trailing-slash form.
   postPatch = ''
+    # The hosted SaaS 307-redirects the bare datasets collection to its trailing-slash form.
     substituteInPlace cognee/cli/api_client.py \
       --replace-fail '"/api/v1/datasets"' '"/api/v1/datasets/"'
+
+    # nixpkgs ships structlog 26.1.0, above the upstream <26 cap. cognee imports and
+    # behaves identically against 26.1.0, and no structlog surface changed in 26 is
+    # used by cognee. Only the cap is dropped; the >=25.2.0 floor still applies, and
+    # --replace-fail fails the build if upstream revises this constraint.
+    substituteInPlace pyproject.toml \
+      --replace-fail '"structlog>=25.2.0,<26"' '"structlog>=25.2.0"'
   '';
 
   pythonRelaxDeps = [
+    # nixpkgs ships gunicorn 26.0.0, above the upstream <24 cap. gunicorn is never
+    # imported on the path this package is used for: cognee-cli speaking HTTP to a
+    # remote API server.
+    "gunicorn"
     "ladybug"
     "limits"
     "pylance"

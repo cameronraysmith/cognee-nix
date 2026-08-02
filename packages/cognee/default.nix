@@ -24,7 +24,6 @@
   instructor,
   jinja2,
   ladybug,
-  lancedb,
   langdetect,
   limits,
   litellm,
@@ -34,7 +33,6 @@
   openai,
   pydantic,
   pydantic-settings,
-  pylance,
   pympler,
   pypdf,
   python-dotenv,
@@ -112,9 +110,25 @@ buildPythonPackage (finalAttrs: {
     # remote API server.
     "gunicorn"
     "limits"
-    "pylance"
     "rdflib"
     "websockets"
+  ];
+
+  # lancedb and pylance are removed rather than relaxed. nixpkgs builds rustc 1.97.0
+  # against LLVM 21.1.8 while rust 1.97.0 pins LLVM 22 in src/llvm-project, and the
+  # AVX-512 VNNI intrinsic signatures changed after the 21.1 branch
+  # (llvm/llvm-project#155194). lance-linalg calls _mm512_dpbusd_epi32 and
+  # _mm512_dpwssd_epi32 unconditionally under cfg(target_arch = "x86_64") with runtime
+  # feature detection, so no cargo feature avoids the codegen and both packages fail to
+  # build on x86_64-linux. Restore them once nixpkgs #524570 and #544495 land off
+  # staging. cognee imports LanceDBAdapter only inside the lancedb branch of
+  # create_vector_engine and has no non-test `import lance`, so the pgvector and qdrant
+  # backends are unaffected; the lancedb backend is unavailable meanwhile. Upstream
+  # still declares both in pyproject.toml, so the Requires-Dist lines must be stripped
+  # or pythonRuntimeDepsCheckHook fails on the absent distributions.
+  pythonRemoveDeps = [
+    "lancedb"
+    "pylance"
   ];
 
   dependencies = [
@@ -135,7 +149,6 @@ buildPythonPackage (finalAttrs: {
     instructor
     jinja2
     ladybug
-    lancedb
     langdetect
     limits
     litellm
@@ -145,7 +158,6 @@ buildPythonPackage (finalAttrs: {
     openai
     pydantic
     pydantic-settings
-    pylance
     pympler
     pypdf
     python-dotenv
